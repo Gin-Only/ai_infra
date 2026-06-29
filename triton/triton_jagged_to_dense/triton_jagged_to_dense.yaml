@@ -1,0 +1,97 @@
+name: triton_jagged_to_dense
+api: pytorch
+version: v2.1
+api_type: triton_jagged_to_dense
+triton_api_type: triton_jagged_to_dense
+triton_name: triton_jagged_to_dense
+generate: generate_triton_jagged_to_dense
+dtype_numbers: 10000  # 测试用例数量
+outputs: 0  # 输出数量，0 表示无配置输出
+standard:
+  acc: single_bm  # 精度标准
+  perf: not_key
+  mem: 1.1
+
+inputs:
+  # jagged tensor的值 (total_elements, embedding_dim)
+  - name: jagged_values
+    type: tensor
+    required: true
+    dtypes:
+      values: [ fp32, fp16, bf16 ]
+    ranges:
+      valid:
+        values: [ [-10000, 10000] ]
+        random_types:
+          - name: nd
+            mean: [0, 5000]
+            std: [1, 500]
+      invalid:
+        values: [ [-10000, 10000] ]
+        random_types:
+          - name: nd
+            mean: [0, 5000]
+            std: [1, 500]
+    shapes:
+      dim_numbers:
+        values: [ 2 ]  # 2D tensor: (total_elements, embedding_dim)
+      dim_values:
+        values: [ [128, 64], [512, 128], [1024, 256], [2048, 512] ]
+        weights: [ 0.2, 0.3, 0.3, 0.2 ]
+      max_length: 40960000
+    boundary:
+      has_empty: false
+      has_infnan: true
+      has_scalar: false
+      has_upper_border: false
+      has_lower_border: false
+    backward: false
+
+  # jagged offsets (batch_size + 1,)
+  - name: jagged_offsets
+    type: tensor
+    required: true
+    dtypes:
+      values: [ int64 ]
+    ranges:
+      valid:
+        values: [ [0, 2048] ]
+      invalid:
+        values: [ [0, 2048] ]
+    shapes:
+      dim_numbers:
+        values: [ 1 ]  # 1D tensor
+      dim_values:
+        values: [ [9, 17, 33, 65] ]  # batch_size + 1
+        weights: [ 0.25, 0.25, 0.25, 0.25 ]
+      max_length: 40960000
+    boundary:
+      has_empty: false
+      has_infnan: false
+      has_scalar: false
+      has_upper_border: false
+      has_lower_border: false
+
+  # max_length - 每个batch中的最大序列长度
+  - name: max_seq_len
+    type: scalar
+    required: true
+    dtypes:
+      values: [ int64 ]
+    ranges:
+      valid:
+        values: [ [16, 512] ]
+      invalid:
+        values: [ [1, 16] ]
+
+  # padding value - 用于填充dense tensor的值
+  - name: padding_value
+    type: scalar
+    required: true
+    dtypes:
+      values: [ fp32 ]
+    ranges:
+      valid:
+        values: [ [0.0, 0.0] ]  # 默认使用0作为padding
+      invalid:
+        values: [ [0.0, 0.0] ]
